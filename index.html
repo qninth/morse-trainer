@@ -364,8 +364,16 @@ document.body.setAttribute('data-theme',DB.settings.theme||'classic');
 function save(){try{localStorage.setItem(DKEY,JSON.stringify(DB));}catch(e){}}
 function el(id){return document.getElementById(id);}
 
-/* ================= 音频引擎(带排程管理, 可全停) ================= */
-var AC=null,MG=null,osc=null,og=null,live=[],playCount=0;
+/* ================= 音频引擎 v4: JS 同步调度, 零排程 =================
+   v1~v3 用 WebAudio 未来排程(o.start(when)/o.stop(when+)): 微信X5等内核下
+   排程的 stop 可能不执行 => 永续鸣叫, 且 onended 不触发 => 无法回收.
+   v4 根治: 每颗音"现在响现在停"(gain 硬控), 节奏由 JS 定时器链驱动.
+   任何一颗音的生命周期都被两个独立机制夹死:
+   1) JS 定时器 stop+静音 (主回收)
+   2) 下一颗音播放前 killAudio 全清 (兜底)
+   同一时刻最多存在 1 个振荡器. 不可能堆叠. */
+var AC=null,MG=null,osc=null,og=null,live=[],playCount=0,timers=[],toneWatch=null;
+var seqToken=0; /* 播放序列令牌: 新播放使旧序列的定时器全部作废 */
 function ensureAC(){
   try{
     if(!AC){var Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
@@ -373,15 +381,19 @@ function ensureAC(){
     if(AC.state==='suspended')AC.resume();
   }catch(e){}
 }
-/* 立即停止所有已排程的音(修"停不下来"核心) */
+/* JS 硬停: 静音+stop+断连+移出live */
+function hardStop(v){
+  try{v.g.gain.cancelScheduledValues(0);v.g.gain.value=0;}catch(e){}
+  try{v.o.stop();}catch(e){}
+  try{v.g.disconnect();}catch(e){}
+  var idx=live.indexOf(v);if(idx>=0)live.splice(idx,1);
+}
+/* 立即停止一切: 取消未触发的序列定时器+硬停所有活体 */
 function killAudio(){
-  for(var i=0;i<live.length;i++){
-    var v=live[i];
-    try{v.o.onended=null;}catch(e){}
-    try{v.o.stop(0);}catch(e){}
-    try{v.g.disconnect();}catch(e){}
-  }
-  live=[];
+  seqToken++;
+  for(var i=0;i<timers.length;i++)clearTimeout(timers[i]);
+  timers=[];
+  while(live.length>0)hardStop(live[0]);
 }
 function timings(){
   var c=DB.settings.wpm,s=Math.min(DB.settings.fwpm,c);
@@ -391,51 +403,102 @@ function timings(){
   var egap=extra/19;
   return {dit:dit,elem:dit,charGap:3*(dit+egap),wordGap:7*(dit+egap)};
 }
-function beep(dur,when,freq){
-  var o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=freq||600;
-  g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(.3,when+.005);
-  g.gain.setValueAtTime(.3,Math.max(when+.005,when+dur-.005));g.gain.linearRampToValueAtTime(0,when+dur);
-  o.connect(g);g.connect(MG);o.start(when);o.stop(when+dur+.03);
-  live.push({o:o,g:g});
-  o.onended=function(){try{g.disconnect();}catch(e){}
-    for(var i=0;i<live.length;i++)if(live[i].o===o){live.splice(i,1);break;}};
+/* 单颗音: 立即出声, delay 毫秒后由 JS 停掉. 无任何未来排程. */
+function beepNow(dur,freq){
+  ensureAC();if(!AC)return;
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.type='sine';o.frequency.value=freq||600;
+  g.gain.setValueAtTime(.3,AC.currentTime);
+  o.connect(g);g.connect(MG);
+  o.start();
+  var self={o:o,g:g};
+  live.push(self);
+  /* 回收: dur 后硬停. 即使定时器失灵, killAudio/下一音也会清 */
+  regTimer(function(){hardStop(self);},dur);
+}
+/* 定时器登记: 触发后自动从数组移除(防止句柄数组无限增长) */
+function regTimer(fn,ms){
+  var id=setTimeout(function(){
+    var idx=timers.indexOf(id);if(idx>=0)timers.splice(idx,1);
+    fn();
+  },ms);
+  timers.push(id);
+  return id;
+}
+/* 把 pattern 拆成 [{on:ms 响,off:ms 停}] 序列, 用定时器链顺序执行 */
+function scheduleSeq(elems,onDone){
+  var my=++seqToken;
+  var T=timings(),idx=0;
+  var GAP=T.elem,WORD_GAP=T.wordGap;
+  function step(){
+    if(my!==seqToken)return; /* 已被新播放/离开页面作废 */
+    if(idx>=elems.length){if(onDone)setTimeout(onDone,WORD_GAP);return;}
+    var e=elems[idx++];
+    if(e.silent){ /* 元素间隔 */
+      regTimer(step,Math.max(e.ms,1));
+      return;
+    }
+    beepNow(e.dur,600);
+    regTimer(step,e.dur+GAP);
+  }
+  regTimer(step,10);
+}
+function itemToElems(item){
+  var T=timings(),out=[];
+  var chars=item.replace(/\s+/g,'').split('');
+  for(var c=0;c<chars.length;c++){
+    var pat=MORSE[chars[c]];if(!pat)continue;
+    for(var i=0;i<pat.length;i++)out.push({dur:pat[i]==='.'?T.dit:T.dit*3});
+    if(c<chars.length-1)out.push({silent:true,ms:T.charGap});
+  }
+  return out;
+}
+/* 相对单位转绝对毫秒 */
+function absElems(elems){
+  var T=timings();
+  return elems.map(function(e){
+    if(e.silent)return e;
+    return {dur:e.unit?T.dit:e.dur*T.dit/3===e.dur?e.dur:e.dur};
+  });
 }
 function playPattern(pat,onDone){
   ensureAC();if(!AC)return 0;
   killAudio();playCount++;
-  var T=timings(),t=AC.currentTime+.05;
-  for(var i=0;i<pat.length;i++){
-    var dur=pat[i]==='.'?T.dit:T.dit*3;
-    beep(dur,t,600);t+=dur+T.elem;
-  }
-  var ms=(t-AC.currentTime)*1000;
-  if(onDone)setTimeout(onDone,ms+60);
+  var T=timings();
+  var elems=[];
+  for(var i=0;i<pat.length;i++)elems.push({dur:pat[i]==='.'?T.dit:T.dit*3});
+  scheduleSeq(elems,onDone);
+  var ms=0;for(var j=0;j<pat.length;j++)ms+=(pat[j]==='.'?T.dit:T.dit*3)+T.elem;
   return ms;
 }
 function playItem(item,onDone){
   ensureAC();if(!AC)return 0;
   killAudio();playCount++;
-  var T=timings(),t=AC.currentTime+.05;
-  var chars=item.replace(/\s+/g,'').split('');
-  for(var c=0;c<chars.length;c++){
-    var pat=MORSE[chars[c]];if(!pat)continue;
-    for(var i=0;i<pat.length;i++){
-      var dur=pat[i]==='.'?T.dit:T.dit*3;
-      beep(dur,t,600);t+=dur+T.elem;
-    }
-    t+=T.charGap-T.elem;
-  }
-  var ms=(t-AC.currentTime)*1000+T.wordGap;
-  if(onDone)setTimeout(onDone,ms);
-  return ms;
+  var elems=itemToElems(item);
+  scheduleSeq(elems,onDone);
+  var T=timings(),ms=0;
+  for(var i=0;i<elems.length;i++)ms+=elems[i].silent?elems[i].ms:elems[i].dur+T.elem;
+  return ms+T.wordGap;
 }
 function startTone(){if(!DB.settings.sidetone)return;ensureAC();if(!AC||osc)return;
   osc=AC.createOscillator();og=AC.createGain();osc.type='sine';osc.frequency.value=600;
   og.gain.setValueAtTime(0,AC.currentTime);og.gain.linearRampToValueAtTime(.3,AC.currentTime+.006);
-  osc.connect(og);og.connect(MG);osc.start();}
-function stopTone(){if(!osc)return;try{var t=AC.currentTime;og.gain.cancelScheduledValues(t);
+  osc.connect(og);og.connect(MG);osc.start();
+  /* 侧音看门狗: pointerup 丢失(微信下拉通知等)导致永鸣的兜底 */
+  var self={o:osc,g:og};
+  toneWatch=setTimeout(function(){stopTone();},60000);}
+function stopTone(){if(toneWatch){clearTimeout(toneWatch);toneWatch=null;}
+  if(!osc)return;try{var t=AC.currentTime;og.gain.cancelScheduledValues(t);
   og.gain.setValueAtTime(og.gain.value,t);og.gain.linearRampToValueAtTime(0,t+.012);osc.stop(t+.03);}catch(e){}
   osc=null;og=null;}
+/* 发送卡键守卫: 按住超3秒(远超最长划音)视为触摸丢失, 自动松开 */
+function stuckKeyGuard(){
+  if(K.down&&performance.now()-K.downAt>3000){
+    K.down=false;stopTone();el('bigKey').classList.remove('pressed');
+    lastKeyUp=performance.now();
+    toast('检测到按键未松开，已自动复位');
+  }
+}
 var sfxCache={};
 function playSfx(name){
   if(!DB.settings.sfx)return;
@@ -925,13 +988,17 @@ document.addEventListener('pointerdown',function(){ensureAC();},{passive:true});
 document.addEventListener('visibilitychange',function(){
   if(document.hidden){killAudio();if(K.down){K.down=false;stopTone();el('bigKey').classList.remove('pressed');}}
 });
-setInterval(sendTick,50);
+setInterval(function(){sendTick();stuckKeyGuard();},50);
 
-/* ================= 测试钩子 ================= */
+/* 测试钩子 */
 window._mm={db:function(){return DB;},startLevel:startLevel,levels:FLAT,
   s:function(){return S;},onKeyTap:onKeyTap,play:playPattern,playItem:playItem,
   MORSE:MORSE,go:showScreen,sendStart:sendStart,sendState:function(){return K;},
   keyDown:keyDown,keyUp:keyUp,live:function(){return live.length;},playCount:function(){return playCount;},
+  timers:function(){return timers.length;},killAudio:killAudio,hardStop:hardStop,
+  ac:function(){return {state:AC?AC.state:'null',currentTime:AC?AC.currentTime:-1};},
+  stopTone:stopTone,startTone:startTone,tone:function(){return osc!==null;},
+  stuckKeyGuard:stuckKeyGuard,
   intro:function(){return document.getElementById('mIntro').classList.contains('active');},
   introStart:function(){el('iStart').click();},
   theme:function(t){DB.settings.theme=t;document.body.setAttribute('data-theme',t);save();}};
