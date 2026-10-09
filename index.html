@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#eef3f8">
+<meta name="mobile-web-app-capable" content="yes">
+<title>摩斯电码特训营</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --bg:#eef3f8; --card:#ffffff; --ink:#1f2d3d; --sub:#7a8ba0; --line:#dfe7ef;
+  --blue:#3b82f6; --blue-deep:#2563eb; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);
+  overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+#app{height:100vh;height:100dvh;max-width:560px;margin:0 auto;position:relative;background:var(--bg)}
+button{font-family:inherit;cursor:pointer;touch-action:manipulation}
+
+.screen{position:absolute;inset:0;display:none;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 14px)}
+.screen.active{display:flex}
+
+/* ---------- 首页 ---------- */
+.hero{margin-top:max(26px,env(safe-area-inset-top));text-align:center}
+.hero .art{font:700 14px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--blue);letter-spacing:4px}
+.hero .t1{font-size:27px;font-weight:800;margin-top:6px}
+.hero .t2{margin-top:8px;color:var(--sub);font-size:13px}
+.hstats{display:flex;justify-content:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstats .chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;color:var(--sub)}
+.hstats .chip b{color:var(--ink)}
+.menu{display:flex;flex-direction:column;gap:11px;margin-top:20px}
+.mbtn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;background:var(--card);
+  border:1px solid var(--line);border-radius:16px;padding:15px 18px;text-align:left;box-shadow:0 2px 8px rgba(31,45,61,.04)}
+.mbtn:active{transform:scale(.985)}
+.mbtn b{font-size:16.5px}
+.mbtn span{font-size:12.5px;color:var(--sub)}
+.mbtn.ghost{background:transparent;box-shadow:none}
+.foot-tip{text-align:center;color:var(--sub);font-size:12px;margin-top:auto;padding-top:14px}
+.foot-tip .m{color:var(--blue);font-weight:700}
+
+/* ---------- 顶栏 ---------- */
+.hud{display:flex;align-items:center;gap:10px}
+.iconbtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:17px;color:var(--ink);flex:none}
+.hud-title{font-weight:700;font-size:16.5px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud2{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--sub)}
+.chip b{color:var(--ink)}
+.chip.warn{color:var(--red);border-color:#fecaca}
+.mini{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:10px;padding:5px 11px;font-size:12.5px;flex:none}
+.mini:active{background:#f1f5f9}
+
+/* ---------- 课程列表 ---------- */
+.lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;overflow-y:auto;
+  padding-bottom:20px;-webkit-overflow-scrolling:touch;align-content:start}
+.lcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 6px 10px;text-align:center}
+.lcard:active{background:#f6f9fc}
+.lcard .n{font-size:11.5px;color:var(--sub)}
+.lcard .cs{font-size:16.5px;font-weight:800;margin:7px 0 5px;letter-spacing:1px;min-height:22px}
+.lcard .st{font-size:11px;color:var(--amber);letter-spacing:2px;min-height:14px}
+.lcard.lock{opacity:.42}
+.lcard .st.lockico{color:var(--sub)}
+
+/* ---------- 训练屏 ---------- */
+.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:0}
+.target{font-size:92px;font-weight:800;line-height:1.05;letter-spacing:2px}
+.target.ok{animation:pop1 .32s}
+.stage.free .target{font-size:25px;font-weight:600;letter-spacing:4px;word-break:break-all;line-height:1.5;
+  height:150px;overflow-y:auto;text-align:center;width:100%;color:var(--ink);-webkit-overflow-scrolling:touch}
+.pattern{display:flex;gap:8px;align-items:center;min-height:16px}
+.pattern .d{width:14px;height:14px;border-radius:50%;background:var(--blue)}
+.pattern .l{width:38px;height:14px;border-radius:7px;background:var(--blue)}
+.pattern.reveal .d,.pattern.reveal .l{background:var(--amber)}
+.feed{min-height:24px;font-size:14.5px;font-weight:600;text-align:center;max-width:100%}
+.feed.ok{color:var(--green)} .feed.err{color:var(--red)}
+.tapewrap{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);
+  border-radius:16px;padding:12px 14px;min-height:62px}
+.tape{flex:1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:18px}
+.tape .ph{color:#b6c2d0;font-size:13.5px}
+.tape .d{width:16px;height:16px;border-radius:50%;background:var(--ink);animation:pop .13s}
+.tape .l{width:42px;height:16px;border-radius:8px;background:var(--ink);animation:pop .13s}
+.keyzone{margin-top:12px}
+.keyhint{text-align:center;color:var(--sub);font-size:12px;margin-bottom:8px}
+.bigkey{width:100%;height:116px;border-radius:24px;border:none;color:#fff;font-size:21px;font-weight:700;letter-spacing:8px;
+  background:linear-gradient(180deg,#4f8ef7,#2563eb);
+  box-shadow:0 6px 0 #1d4ed8,0 12px 24px rgba(37,99,235,.25);
+  transition:transform .05s,box-shadow .05s;touch-action:none}
+.bigkey.pressed{transform:translateY(4px);box-shadow:0 2px 0 #1d4ed8,0 6px 14px rgba(37,99,235,.3);
+  background:linear-gradient(180deg,#3b7cf0,#1d4ed8)}
+@keyframes pop{from{transform:scale(.4);opacity:.3}to{transform:scale(1);opacity:1}}
+@keyframes pop1{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.shake{animation:shk .28s}
+
+/* ---------- 弹层 ---------- */
+.modal{position:absolute;inset:0;background:rgba(30,41,59,.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.modal.active{display:flex}
+.sheet{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));
+  max-height:84%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet h3{font-size:17.5px;margin-bottom:10px;text-align:center}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.row:last-of-type{border-bottom:none}
+.tog{width:52px;height:30px;border-radius:15px;background:#cbd5e1;position:relative;border:none;transition:.15s;flex:none}
+.tog.on{background:var(--green)}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.15s}
+.tog.on::after{left:25px}
+.seg{display:flex;background:#eef2f7;border-radius:10px;padding:3px;gap:2px}
+.seg button{border:none;background:transparent;padding:6px 13px;border-radius:8px;font-size:13px;color:var(--sub)}
+.seg button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.rbtn{width:100%;padding:13px;border-radius:14px;border:none;background:var(--blue-deep);color:#fff;font-size:15.5px;font-weight:700;margin-top:12px}
+.rbtn.sec{background:#eef2f7;color:var(--ink)}
+.rstars{text-align:center;font-size:34px;letter-spacing:8px;color:var(--amber);margin:6px 0 10px;min-height:40px}
+.rline{display:flex;justify-content:space-between;padding:9px 4px;font-size:14.5px;border-bottom:1px dashed var(--line)}
+.rline b{font-weight:700}
+.cheat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+.cc{background:#f6f8fb;border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}
+.cc b{font-size:15.5px}
+.cc .mp{font:12px ui-monospace,Consolas,monospace;color:var(--blue);letter-spacing:1px;margin-top:3px}
+
+#toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 150px);transform:translateX(-50%);
+  background:rgba(31,45,61,.85);color:#fff;font-size:13px;padding:8px 16px;border-radius:999px;
+  opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;white-space:nowrap}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 首页 -->
+  <section id="sc-home" class="screen active">
+    <div class="hero">
+      <div class="art">· — · · · — · — — · — ·</div>
+      <div class="t1">摩斯电码特训营</div>
+      <div class="t2">像 MorseMania 一样，把电码敲进肌肉记忆</div>
+      <div class="hstats">
+        <span class="chip">敲击 <b id="hKeyed">0</b> 次</span>
+        <span class="chip">正确率 <b id="hAcc">--</b></span>
+        <span class="chip">挑战最佳 <b id="hBest">0</b></span>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="mbtn" data-go="lessons"><b>课程闯关</b><span>12 关 · 从 E T 起步，字母到数字标点</span></button>
+      <button class="mbtn" data-go="listen"><b>听音训练</b><span>只听声音，凭耳朵敲出来</span></button>
+      <button class="mbtn" data-go="challenge"><b>60 秒挑战</b><span>已学字母限时快敲，冲击最高分</span></button>
+      <button class="mbtn" data-go="free"><b>自由练习</b><span>随便敲 · 实时解码 + 全表对照</span></button>
+      <button class="mbtn ghost" id="btnSettings"><b>设置</b><span>侧音 / 键速 / 发码速度</span></button>
+    </div>
+    <div class="foot-tip">短按 <span class="m">·</span>　长按 <span class="m">—</span>　松手后停顿自动提交<br>手机按住大按钮，电脑按住 <b>空格</b> 键</div>
+  </section>
+
+  <!-- 课程列表 -->
+  <section id="sc-lessons" class="screen">
+    <div class="hud">
+      <button class="iconbtn" data-back="1">←</button>
+      <div class="hud-title">课程闯关</div>
+    </div>
+    <div class="lgrid" id="lgrid"></div>
+  </section>
+
+  <!-- 训练屏（课程/听音/挑战/自由共用） -->
+  <section id="sc-game" class="screen">
+    <div class="hud">
+      <button class="iconbtn" data-back="1">←</button>
+      <div class="hud-title" id="gTitle">课程</div>
+      <button class="mini" id="btnPool" style="display:none">词库:已学</button>
+      <button class="mini" id="btnCheat" style="display:none">码表</button>
+      <button class="mini" id="btnWipe" style="display:none">清空</button>
+    </div>
+    <div class="hud2">
+      <span class="chip" id="gProg"></span>
+      <span class="chip" id="gScore"></span>
+      <span class="chip" id="gStreak"></span>
+      <span class="chip warn" id="gTimer" style="display:none"></span>
+    </div>
+    <div class="stage" id="gStage">
+      <div class="target" id="gTarget">A</div>
+      <div class="pattern" id="gPattern"></div>
+      <div class="feed" id="gFeed"></div>
+      <button class="mini" id="btnReplay" style="display:none">重听</button>
+    </div>
+    <div class="tapewrap">
+      <div class="tape" id="gTape"></div>
+      <button class="mini" id="btnClear">清除</button>
+    </div>
+    <div class="keyzone">
+      <div class="keyhint" id="gKeyHint">短按 = ·　长按 = —　停顿自动提交　｜　电脑可按住空格</div>
+      <button class="bigkey" id="bigKey">按 住 敲 击</button>
+    </div>
+  </section>
+
+  <!-- 结果弹层 -->
+  <div class="modal" id="mResult">
+    <div class="sheet">
+      <h3 id="rTitle">完成！</h3>
+      <div class="rstars" id="rStars"></div>
+      <div id="rLines"></div>
+      <div id="rBtns"></div>
+    </div>
+  </div>
+
+  <!-- 设置弹层 -->
+  <div class="modal" id="mSettings">
+    <div class="sheet">
+      <h3>设置</h3>
+      <div class="row"><span>侧音（按键时发声）</span><button class="tog" data-set="sidetone"></button></div>
+      <div class="row"><span>对 / 错提示音</span><button class="tog" data-set="sfx"></button></div>
+      <div class="row"><span>课程中显示目标码</span><button class="tog" data-set="hint"></button></div>
+      <div class="row"><span>键速（· / — 判定）</span>
+        <div class="seg" data-seg="speed">
+          <button data-v="slow">慢</button><button data-v="std">标准</button><button data-v="fast">快</button>
+        </div>
+      </div>
+      <div class="row"><span>发码速度（听音）</span>
+        <div class="seg" data-seg="wpm">
+          <button data-v="10">10</button><button data-v="15">15</button><button data-v="20">20</button><button data-v="25">25</button>
+        </div>
+      </div>
+      <button class="rbtn" id="btnSetDone">完成</button>
+    </div>
+  </div>
+
+  <!-- 码表弹层 -->
+  <div class="modal" id="mCheat">
+    <div class="sheet">
+      <h3>摩斯电码表（点一下听音）</h3>
+      <div class="cheat" id="cheatGrid"></div>
+      <button class="rbtn sec" id="btnCheatDone">关闭</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ================= 数据 ================= */
+var MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',
+M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',
+'0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.',
+'.':'.-.-.-','?':'..--..','/':'-..-.'};
+var REV={};for(var k in MORSE){REV[MORSE[k]]=k;}
+var LESSONS=[
+ {nw:['E','T']},{nw:['A','N']},{nw:['I','M']},{nw:['S','O','H']},{nw:['R','D','U']},{nw:['L','C','W']},
+ {nw:['F','G','Y']},{nw:['P','B','K','V']},{nw:['J','X','Q','Z']},
+ {nw:['1','2','3','4','5']},{nw:['6','7','8','9','0']},{nw:['.','?','/']}
+];
+LESSONS.forEach(function(l,i){var acc=[];for(var j=0;j<=i;j++)acc=acc.concat(LESSONS[j].nw);l.rev=acc;});
+
+/* ================= 存档 ================= */
+var DKEY='morseTrainer.v1';
+var DB=null;
+try{DB=JSON.parse(localStorage.getItem(DKEY));}catch(e){DB=null;}
+if(!DB||!DB.settings){DB={stars:{},unlocked:1,
+ settings:{sidetone:true,sfx:true,hint:true,speed:'std',wpm:15,vol:.5},
+ stats:{keyed:0,items:0,correct:0,bestScore:0,bestCombo:0}};}
+function save(){try{localStorage.setItem(DKEY,JSON.stringify(DB));}catch(e){}}
+var SPD={slow:{dotMs:350,gapMs:850},std:{dotMs:250,gapMs:600},fast:{dotMs:180,gapMs:420}};
+function dotMs(){return SPD[DB.settings.speed].dotMs;}
+function gapMs(){return SPD[DB.settings.speed].gapMs;}
+
+function el(id){return document.getElementById(id);}
+var bigKey=el('bigKey'),gTarget=el('gTarget'),gPattern=el('gPattern'),gFeed=el('gFeed'),
+    gTape=el('gTape'),gTitle=el('gTitle'),gProg=el('gProg'),gScore=el('gScore'),gStreak=el('gStreak'),
+    gTimer=el('gTimer'),gStage=el('gStage');
+
+/* ================= 音频 ================= */
+var AC=null,MG=null,osc=null,og=null;
+function ensureAC(){
+  try{
+    if(!AC){var Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
+      AC=new Ctx();MG=AC.createGain();MG.gain.value=DB.settings.vol;MG.connect(AC.destination);}
+    if(AC.state==='suspended')AC.resume();
+  }catch(e){}
+}
+function startTone(){
+  if(!DB.settings.sidetone)return;ensureAC();if(!AC||osc)return;
+  osc=AC.createOscillator();og=AC.createGain();osc.type='sine';osc.frequency.value=620;
+  og.gain.setValueAtTime(0,AC.currentTime);og.gain.linearRampToValueAtTime(.25,AC.currentTime+.006);
+  osc.connect(og);og.connect(MG);osc.start();
+}
+function stopTone(){
+  if(!osc)return;
+  try{var t=AC.currentTime;og.gain.cancelScheduledValues(t);og.gain.setValueAtTime(og.gain.value,t);
+    og.gain.linearRampToValueAtTime(0,t+.012);osc.stop(t+.03);}catch(e){}
+  osc=null;og=null;
+}
+function beepAt(dur,when,freq,type){
+  var o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.value=freq||600;
+  g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(.28,when+.005);
+  g.gain.setValueAtTime(.28,Math.max(when+.005,when+dur-.005));g.gain.linearRampToValueAtTime(0,when+dur);
+  o.connect(g);g.connect(MG);o.start(when);o.stop(when+dur+.03);
+}
+function playPattern(pat,done){
+  ensureAC();if(!AC||!pat)return 0;
+  var u=1200/(DB.settings.wpm),t=AC.currentTime+.06,i;
+  for(i=0;i<pat.length;i++){
+    if(pat[i]==='.'){beepAt(u,t);t+=u*2;}else{beepAt(u*3,t);t+=u*4;}
+  }
+  var ms=(t-AC.currentTime)*1000;
+  if(done)setTimeout(done,ms+80);
+  return ms;
+}
+function sfxOk(){if(!DB.settings.sfx)return;ensureAC();if(!AC)return;var t=AC.currentTime;beepAt(.07,t,880);beepAt(.09,t+.09,1318);}
+function sfxErr(){if(!DB.settings.sfx)return;ensureAC();if(!AC)return;beepAt(.16,AC.currentTime,185,'square');}
+
+/* ================= 键控 ================= */
+var KEY={pressing:false,downAt:0,upAt:0,syms:''};
+function now(){return performance.now();}
+function keyDown(){
+  if(KEY.pressing)return;
+  KEY.pressing=true;KEY.downAt=now();startTone();bigKey.classList.add('pressed');
+}
+function keyUp(){
+  if(!KEY.pressing)return;
+  KEY.pressing=false;stopTone();bigKey.classList.remove('pressed');
+  var d=now()-KEY.downAt;
+  KEY.syms+=(d<dotMs()?'.':'-');
+  if(KEY.syms.length>6)KEY.syms=KEY.syms.slice(-6);
+  KEY.upAt=now();DB.stats.keyed++;renderTape();
+}
+function tick(){
+  if(!KEY.pressing&&KEY.syms&&now()-KEY.upAt>gapMs())commitKey();
+}
+function commitKey(){
+  if(!KEY.syms)return;
+  var pat=KEY.syms;KEY.syms='';renderTape();save();
+  onDecoded(pat,REV[pat]);
+}
+function clearTape(){KEY.syms='';renderTape();}
+function renderTape(){
+  var html='';
+  if(KEY.syms){
+    for(var i=0;i<KEY.syms.length;i++)html+='<span class="'+(KEY.syms[i]==='.'?'d':'l')+'"></span>';
+  }else{
+    html='<span class="ph">在这里敲…</span>';
+  }
+  gTape.innerHTML=html;
+}
+
+/* ================= 会话 ================= */
+var mode=null,targets=[],tIdx=0,wrongs=0,score=0,combo=0,bestCombo=0,firstTry=0,tries=0,
+    lessonId=0,tLeft=0,timerIv=null,poolIdx=0,cur=null,lock=false;
+var POOLS=['learn','all','num','mix'],POOL_NAMES={learn:'已学',all:'全部字母',num:'数字',mix:'混合'};
+function rand(a){return a[Math.floor(Math.random()*a.length)];}
+function unlockedLetters(){
+  var u=[],i,n=Math.min(DB.unlocked-1,LESSONS.length);
+  for(i=0;i<n;i++)u=u.concat(LESSONS[i].nw);
+  if(!u.length)u=['E','T'];
+  return u;
+}
+function buildPool(p){
+  var AZ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),N9='0123456789'.split('');
+  if(p==='all')return AZ;
+  if(p==='num')return N9;
+  if(p==='mix')return AZ.concat(N9);
+  return unlockedLetters();
+}
+
+function resetSession(){
+  targets=[];tIdx=0;wrongs=0;score=0;combo=0;bestCombo=0;firstTry=0;tries=0;lock=false;cur=null;
+  if(timerIv){clearInterval(timerIv);timerIv=null;}
+  gStage.classList.remove('free');
+  gTimer.style.display='none';gScore.parentElement===null||(gScore.style.display='',gStreak.style.display='');
+  el('btnReplay').style.display='none';el('btnPool').style.display='none';
+  el('btnCheat').style.display='none';el('btnWipe').style.display='none';
+}
+function showScreen(id){
+  var s=document.querySelectorAll('.screen');
+  for(var i=0;i<s.length;i++)s[i].classList.toggle('active',s[i].id==='sc-'+id);
+  closeModal('mResult');
+  if(id==='home')renderHome();
+}
+
+function startLesson(id){
+  resetSession();
+  mode='lesson';lessonId=id;
+  var L=LESSONS[id-1],i,arr=[];
+  for(i=0;i<10;i++){
+    var pool=Math.random()<.55?L.nw:L.rev;
+    arr.push(rand(pool));
+  }
+  targets=arr;
+  gTitle.textContent='课程 '+id+' · '+L.nw.join(' ');
+  showScreen('game');renderTape();nextItem();
+}
+function startListen(){
+  resetSession();
+  mode='listen';poolIdx=0;
+  makeListenRound();
+  el('btnPool').style.display='';
+  updatePoolBtn();
+  gTitle.textContent='听音训练';
+  showScreen('game');renderTape();nextItem();
+}
+function makeListenRound(){
+  var pool=buildPool(POOLS[poolIdx]),i,arr=[];
+  for(i=0;i<10;i++)arr.push(rand(pool));
+  targets=arr;
+}
+function restartListen(){
+  resetSession();mode='listen';
+  makeListenRound();
+  el('btnPool').style.display='';updatePoolBtn();
+  gTitle.textContent='听音训练';
+  showScreen('game');renderTape();nextItem();
+}
+function startChallenge(){
+  resetSession();
+  mode='challenge';
+  gTitle.textContent='60 秒挑战';
+  gTimer.style.display='';
+  showScreen('game');renderTape();
+  tLeft=60;updateHud();nextItem();
+  timerIv=setInterval(function(){
+    tLeft--;updateHud();
+    if(tLeft<=0){finish();}
+  },1000);
+}
+function startFree(){
+  resetSession();
+  mode='free';
+  gTitle.textContent='自由练习';
+  gStage.classList.add('free');
+  gTarget.textContent='敲出的字符会出现在这里…';
+  gScore.style.display='none';gStreak.style.display='none';gProg.style.display='none';
+  el('btnCheat').style.display='';el('btnWipe').style.display='';
+  el('gKeyHint').textContent='短按 = ·　长按 = —　停顿提交一个字符　｜　电脑可按住空格';
+  showScreen('game');renderTape();
+}
+
+function nextItem(){
+  if(mode==='challenge'){
+    cur=rand(buildPool('learn'));
+    renderTarget();updateHud();return;
+  }
+  if(tIdx>=targets.length){finish();return;}
+  cur=targets[tIdx];wrongs=0;
+  renderTarget();updateHud();
+  if(mode==='listen')playCur();
+}
+function playCur(){if(cur&&MORSE[cur])playPattern(MORSE[cur]);}
+
+function renderTarget(){
+  gFeed.textContent='';gFeed.className='feed';
+  gPattern.classList.remove('reveal');
+  el('btnReplay').style.display=(mode==='listen'||mode==='lesson')?'':'none';
+  if(mode==='listen'){
+    gTarget.textContent=(wrongs>=2)?cur:'?';
+    gPattern.innerHTML='';
+  }else if(mode==='challenge'){
+    gTarget.textContent=cur;gPattern.innerHTML='';
+  }else{
+    gTarget.textContent=cur;
+    gPattern.innerHTML='';
+    if(DB.settings.hint&&cur&&MORSE[cur])renderPattern(gPattern,MORSE[cur]);
+  }
+}
+function renderPattern(box,pat){
+  box.innerHTML='';
+  for(var i=0;i<pat.length;i++){
+    var s=document.createElement('span');
+    s.className=(pat[i]==='.')?'d':'l';
+    box.appendChild(s);
+  }
+}
+function updateHud(){
+  if(mode==='challenge'){
+    gProg.textContent='已答 '+tries;
+    gScore.innerHTML='得分 <b>'+score+'</b>';
+    gStreak.innerHTML='连击 <b>'+combo+'</b>';
+    gTimer.textContent='⏱ '+tLeft+'s';
+  }else{
+    gProg.textContent='第 '+Math.min(tIdx+1,10)+' / 10 题';
+    gScore.innerHTML='得分 <b>'+score+'</b>';
+    gStreak.innerHTML='连击 <b>'+combo+'</b>';
+  }
+}
+function updatePoolBtn(){el('btnPool').textContent='词库:'+POOL_NAMES[POOLS[poolIdx]];}
+
+function feedMsg(t,cls){gFeed.textContent=t;gFeed.className='feed '+cls;}
+function popTarget(){gTarget.classList.remove('ok');void gTarget.offsetWidth;gTarget.classList.add('ok');}
+function shakeTarget(){gTarget.classList.remove('shake');void gTarget.offsetWidth;gTarget.classList.add('shake');}
+function revealPattern(){
+  if(!cur||!MORSE[cur])return;
+  renderPattern(gPattern,MORSE[cur]);
+  gPattern.classList.add('reveal');
+  setTimeout(function(){
+    if(gPattern.classList.contains('reveal')){
+      gPattern.classList.remove('reveal');
+      if(mode==='lesson'&&DB.settings.hint&&cur){renderPattern(gPattern,MORSE[cur]);}else{gPattern.innerHTML='';}
+    }
+  },1700);
+}
+
+function onDecoded(pat,ch){
+  if(mode==='free'){
+    gTarget.textContent+=(ch||'□');
+    gTarget.scrollTop=gTarget.scrollHeight;
+    return;
+  }
+  if(lock||!cur)return;
+  tries++;DB.stats.items++;
+  if(ch===cur){
+    answered1();
+  }else{
+    wrongs++;combo=0;
+    sfxErr();feedMsg('✗ '+(ch?('敲成了「'+ch+'」'):'未识别 '+pat)+' · 正确 '+cur+' '+MORSE[cur],'err');
+    shakeTarget();revealPattern();
+    if(mode==='listen'&&wrongs>=2)gTarget.textContent=cur;
+    if(mode==='challenge'){setTimeout(nextItem,650);}
+    updateHud();
+  }
+  save();
+}
+function answered1(){
+  var first=(wrongs===0)?1:0;
+  firstTry+=first;combo++;bestCombo=Math.max(bestCombo,combo);
+  score+=100+combo*10;
+  DB.stats.correct++;
+  DB.stats.bestCombo=Math.max(DB.stats.bestCombo,bestCombo);
+  sfxOk();feedMsg('✓ '+cur,'ok');popTarget();
+  if(mode==='challenge'){updateHud();setTimeout(nextItem,260);}
+  else{lock=true;updateHud();setTimeout(function(){lock=false;tIdx++;nextItem();},430);}
+}
+function finish(){
+  if(!mode)return;
+  if(timerIv){clearInterval(timerIv);timerIv=null;}
+  stopTone();
+  var m=mode;mode=null;
+  if(m==='lesson'){
+    var stars=(firstTry>=9)?3:(firstTry>=7?2:1);
+    DB.stars[lessonId]=Math.max(DB.stars[lessonId]||0,stars);
+    DB.unlocked=Math.max(DB.unlocked,Math.min(lessonId+1,LESSONS.length));
+    save();
+    showResult('课程 '+lessonId+' 完成',stars,[
+      ['一遍正确',firstTry+' / 10'],
+      ['最大连击',bestCombo],
+      ['得分',score]
+    ],[
+      {t:'重练本课',sec:1,fn:(function(id){return function(){closeModal('mResult');startLesson(id);};})(lessonId)},
+      {t:'下一课',fn:(function(id){return function(){closeModal('mResult');startLesson(id);};})(lessonId+1)}
+    ],lessonId<LESSONS.length);
+  }else if(m==='listen'){
+    var acc=Math.round(firstTry/10*100);
+    showResult('听音训练 · '+POOL_NAMES[POOLS[poolIdx]],0,[
+      ['一遍正确',firstTry+' / 10'],
+      ['正确率',acc+'%'],
+      ['最大连击',bestCombo]
+    ],[
+      {t:'再来一组',fn:function(){closeModal('mResult');restartListen();}},
+      {t:'返回',sec:1,fn:function(){closeModal('mResult');showScreen('home');mode=null;}}
+    ],false);
+  }else if(m==='challenge'){
+    var isBest=score>(DB.stats.bestScore||0);
+    if(isBest)DB.stats.bestScore=score;
+    save();
+    var acc2=tries?Math.round((firstTry+Math.max(0,tries-firstTry-firstTry))/tries*100):0;
+    /* 挑战模式正确率=正确题数/总敲题数 */
+    var solved=0;
+    showResult('挑战结束',0,[
+      ['得分',score+(isBest?' 🏆 新纪录':'')],
+      ['历史最佳',DB.stats.bestScore]
+    ],[
+      {t:'再战一局',fn:function(){closeModal('mResult');startChallenge();}},
+      {t:'返回',sec:1,fn:function(){closeModal('mResult');showScreen('home');}}
+    ],false);
+  }
+}
+function showResult(title,stars,lines,btns,hasNext){
+  el('rTitle').textContent=title;
+  var s='';
+  if(stars>0){for(var i=0;i<3;i++)s+=(i<stars?'★':'☆');}
+  el('rStars').textContent=s;
+  var lh='';
+  for(var j=0;j<lines.length;j++)lh+='<div class="rline"><span>'+lines[j][0]+'</span><b>'+lines[j][1]+'</b></div>';
+  el('rLines').innerHTML=lh;
+  var bh='';
+  var ids=[];
+  for(var b=0;b<btns.length;b++){
+    if(btns[b].t==='下一课'&&!hasNext)continue;
+    var bid='rb'+b;ids.push({id:bid,fn:btns[b].fn});
+    bh+='<button class="rbtn'+(btns[b].sec?' sec':'')+'" id="'+bid+'">'+btns[b].t+'</button>';
+  }
+  el('rBtns').innerHTML=bh;
+  ids.forEach(function(x){el(x.id).addEventListener('click',x.fn);});
+  el('mResult').classList.add('active');
+}
+function closeModal(id){el(id).classList.remove('active');}
+
+/* ================= 首页/列表渲染 ================= */
+function renderHome(){
+  el('hKeyed').textContent=DB.stats.keyed;
+  var acc=DB.stats.items?Math.round(DB.stats.correct/DB.stats.items*100)+'%':'--';
+  el('hAcc').textContent=acc;
+  el('hBest').textContent=DB.stats.bestScore||0;
+}
+function renderLessons(){
+  var g=el('lgrid');g.innerHTML='';
+  LESSONS.forEach(function(L,i){
+    var n=i+1,locked=n>DB.unlocked,stars=DB.stars[n]||0;
+    var c=document.createElement('button');
+    c.className='lcard'+(locked?' lock':'');
+    var st='';
+    if(locked)st='<span class="st lockico">🔒</span>';
+    else{for(var s=0;s<3;s++)st+=(s<stars?'★':'☆');st='<span class="st">'+st+'</span>';}
+    c.innerHTML='<div class="n">第 '+n+' 关</div><div class="cs">'+L.nw.join(' ')+'</div>'+st;
+    c.addEventListener('click',function(){
+      if(locked){toast('先完成上一关');return;}
+      startLesson(n);
+    });
+    g.appendChild(c);
+  });
+}
+
+/* ================= 码表 ================= */
+function renderCheat(){
+  var g=el('cheatGrid');g.innerHTML='';
+  var keys='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.?/'.split('');
+  keys.forEach(function(ch){
+    var c=document.createElement('button');
+    c.className='cc';
+    c.innerHTML='<b>'+ch+'</b><div class="mp">'+MORSE[ch]+'</div>';
+    c.addEventListener('click',function(){ensureAC();playPattern(MORSE[ch]);});
+    g.appendChild(c);
+  });
+}
+
+/* ================= 设置面板 ================= */
+function renderSettings(){
+  var tgs=document.querySelectorAll('.tog[data-set]');
+  for(var i=0;i<tgs.length;i++){
+    tgs[i].classList.toggle('on',!!DB.settings[tgs[i].getAttribute('data-set')]);
+  }
+  var segs=document.querySelectorAll('.seg[data-seg]');
+  for(var j=0;j<segs.length;j++){
+    var key=segs[j].getAttribute('data-seg');
+    var bs=segs[j].querySelectorAll('button');
+    for(var b=0;b<bs.length;b++){
+      var v=bs[b].getAttribute('data-v');
+      var cur2=(key==='wpm')?String(DB.settings.wpm):DB.settings.speed;
+      bs[b].classList.toggle('on',v===cur2);
+      bs[b].onclick=(function(k,vv){return function(){
+        if(k==='wpm')DB.settings.wpm=parseInt(vv,10);else DB.settings.speed=vv;
+        save();renderSettings();
+      };})(key,v);
+    }
+  }
+}
+function bindToggles(){
+  var tgs=document.querySelectorAll('.tog[data-set]');
+  for(var i=0;i<tgs.length;i++){
+    tgs[i].addEventListener('click',function(){
+      var k=this.getAttribute('data-set');
+      DB.settings[k]=!DB.settings[k];save();renderSettings();
+      if(k==='sidetone'&&!DB.settings.sidetone)stopTone();
+    });
+  }
+}
+
+/* ================= toast ================= */
+var toastT=null;
+function toast(msg){
+  var t=el('toast');t.textContent=msg;t.classList.add('show');
+  if(toastT)clearTimeout(toastT);
+  toastT=setTimeout(function(){t.classList.remove('show');},1400);
+}
+
+/* ================= 输入绑定 ================= */
+function isPlaying(){return el('sc-game').classList.contains('active');}
+function pd(e){if(!isPlaying())return;e.preventDefault();ensureAC();keyDown();}
+function pu(e){if(!KEY.pressing)return;if(e.cancelable)e.preventDefault();keyUp();}
+if(window.PointerEvent){
+  bigKey.addEventListener('pointerdown',pd);
+  bigKey.addEventListener('contextmenu',function(e){e.preventDefault();});
+  window.addEventListener('pointerup',pu);
+  window.addEventListener('pointercancel',pu);
+}else{
+  bigKey.addEventListener('touchstart',pd,{passive:false});
+  bigKey.addEventListener('touchend',pu,{passive:false});
+  bigKey.addEventListener('touchcancel',pu,{passive:false});
+  bigKey.addEventListener('contextmenu',function(e){e.preventDefault();});
+  bigKey.addEventListener('mousedown',pd);
+  window.addEventListener('mouseup',pu);
+}
+window.addEventListener('keydown',function(e){
+  if(!isPlaying())return;
+  if(e.code==='Space'){e.preventDefault();if(!e.repeat){ensureAC();keyDown();}}
+  else if(e.code==='Enter'){e.preventDefault();if(KEY.syms)commitKey();}
+});
+window.addEventListener('keyup',function(e){
+  if(e.code==='Space'){e.preventDefault();if(isPlaying())keyUp();}
+});
+document.addEventListener('pointerdown',function(){ensureAC();},{passive:true});
+
+/* 菜单/返回 */
+var goBtns=document.querySelectorAll('[data-go]');
+for(var i=0;i<goBtns.length;i++){
+  goBtns[i].addEventListener('click',(function(g){
+    return function(){
+      ensureAC();
+      if(g==='lessons'){renderLessons();showScreen('lessons');}
+      else if(g==='listen'){startListen();}
+      else if(g==='challenge'){startChallenge();}
+      else if(g==='free'){startFree();}
+    };
+  })(goBtns[i].getAttribute('data-go')));
+}
+var backBtns=document.querySelectorAll('[data-back]');
+for(var b2=0;b2<backBtns.length;b2++){
+  backBtns[b2].addEventListener('click',function(){
+    if(timerIv){clearInterval(timerIv);timerIv=null;}
+    stopTone();KEY.pressing=false;bigKey.classList.remove('pressed');
+    mode=null;
+    showScreen(el('sc-lessons').classList.contains('active')?'home':'home');
+    renderLessons();
+  });
+}
+el('btnClear').addEventListener('click',clearTape);
+el('btnWipe').addEventListener('click',function(){gTarget.textContent='敲出的字符会出现在这里…';});
+el('btnReplay').addEventListener('click',function(){ensureAC();playCur();});
+el('btnPool').addEventListener('click',function(){
+  poolIdx=(poolIdx+1)%POOLS.length;updatePoolBtn();
+  toast('词库切换：'+POOL_NAMES[POOLS[poolIdx]]);
+  restartListen();
+});
+el('btnCheat').addEventListener('click',function(){renderCheat();el('mCheat').classList.add('active');});
+el('btnCheatDone').addEventListener('click',function(){closeModal('mCheat');});
+el('btnSettings').addEventListener('click',function(){ensureAC();renderSettings();el('mSettings').classList.add('active');});
+el('btnSetDone').addEventListener('click',function(){closeModal('mSettings');});
+
+/* ================= 启动 ================= */
+setInterval(tick,40);
+renderHome();renderLessons();renderTape();renderCheat();
+
+/* 测试钩子 */
+window._mt={keyDown:keyDown,keyUp:keyUp,commitKey:commitKey,clearTape:clearTape,
+  startLesson:startLesson,startListen:startListen,startChallenge:startChallenge,startFree:startFree,
+  go:function(id){ if(id==='lessons'){renderLessons();showScreen('lessons');} else showScreen(id);},
+  db:function(){return DB;},s:function(){return {mode:mode,cur:cur,tIdx:tIdx,score:score};},
+  MORSE:MORSE,REV:REV,play:playPattern,feed:function(p){KEY.syms=p;commitKey();}};
+})();
+</script>
+</body>
+</html>
