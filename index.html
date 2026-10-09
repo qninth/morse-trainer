@@ -534,22 +534,34 @@ function showScreen(id){
 
 /* ================= 关卡会话 ================= */
 var S=null;
+/* 加权随机抽题: 单字关每题独立抽, 防止小题池死循环交替 (ETETET bug) */
+function pickChar(){
+  var L=S.L,pool=L.pool,n=pool.length;
+  /* 新字符权重3, 旧字符权重1; 上一题出现过的字大幅降权(0.15)但不禁
+     (完全禁止在2字符池下=强制交替, 又变确定性) */
+  var weights=[],total=0;
+  for(var i=0;i<n;i++){
+    var w=(L.cs.indexOf(pool[i])>=0)?3:1;
+    if(pool[i]===S.lastChar)w=0.15;
+    weights.push(w);total+=w;
+  }
+  var r=Math.random()*total;
+  for(var j=0;j<n;j++){r-=weights[j];if(r<0)return pool[j];}
+  return pool[n-1];
+}
+function pickWord(){
+  var L=S.L,items=L.items,n=items.length;
+  if(n===1)return items[0];
+  var w,guard=0;
+  do{w=items[Math.floor(Math.random()*n)];guard++;}
+  while(w===S.lastChar&&guard<10);
+  return w;
+}
 function startLevel(fid){
   var L=FLAT[fid];
   S={L:L,fid:fid,mode:L.t,progress:0,score:0,streak:0,best:0,tries:0,wrongs:0,
      lives:DB.settings.lives,itemIdx:-1,curItem:null,typedPos:0,lock:false,hints:0,
-     wrongTries:0,answerT0:0,started:false};
-  if(L.t==='single'){
-    S.pools=shuffle(L.pool.map(function(c){return {text:c};}));
-  }else if(L.t==='word'){
-    S.pools=shuffle((L.items||[]).map(function(w){return {text:w};}));
-    var base=L.items.slice();
-    while(S.pools.length<6)S.pools=S.pools.concat(shuffle(base.map(function(w){return {text:w};})));
-  }else if(L.t==='challenge'){
-    var pool=L.pool.slice();
-    S.pools=[];
-    for(var i=0;i<25;i++)S.pools.push({text:pool[Math.floor(Math.random()*pool.length)]});
-  }
+     wrongTries:0,answerT0:0,started:false,lastChar:null};
   el('gTitle').textContent=L.catName+' '+(L.idx+1)+' · '+(L.t==='challenge'?'挑战':(L.t==='word'?'听词':'听音'));
   el('gHearts').style.display=L.t==='challenge'?'':'none';
   el('btnHint').style.display=L.t==='challenge'?'none':'';
@@ -616,7 +628,12 @@ function updateHud(){
 }
 function renderItem(){
   S.itemIdx++;S.typedPos=0;S.lock=false;S.hints=0;S.wrongTries=0;
-  S.curItem=S.pools[S.itemIdx%S.pools.length];
+  var text;
+  if(S.mode==='single'){text=pickChar();}
+  else if(S.mode==='word'){text=pickWord();}
+  else{text=S.L.pool[Math.floor(Math.random()*S.L.pool.length)];}
+  S.lastChar=text;
+  S.curItem={text:text};
   S.answerT0=performance.now();
   renderSlots(S.curItem.text);
   el('gPattern').innerHTML='';
