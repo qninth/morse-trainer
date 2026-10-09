@@ -148,6 +148,9 @@ button{font-family:inherit;cursor:pointer;touch-action:manipulation}
   background:var(--ink);color:var(--bg);font-size:12.5px;padding:7px 15px;border-radius:999px;
   opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;white-space:nowrap}
 #toast.show{opacity:1}
+/* 闪光播报: 全屏白光, 点=短闪/划=长闪 */
+#flashOv{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:40}
+#flashOv.on{opacity:.92}
 @keyframes pop{from{transform:scale(.4);opacity:.3}to{transform:scale(1);opacity:1}}
 @keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 </style>
@@ -282,6 +285,7 @@ button{font-family:inherit;cursor:pointer;touch-action:manipulation}
         <div class="seg" data-seg="speedPct"><button data-v="50">50%</button><button data-v="100">100%</button><button data-v="200">200%</button><button data-v="300">300%</button></div></div>
       <div class="row"><div>挑战命数<div class="desc">原版默认 3</div></div>
         <div class="seg" data-seg="lives"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
+      <div class="row"><span>闪光播报<div class="desc">播放不出声，改用屏幕白光：短闪=· 长闪=—</div></span><button class="tog" data-set="flash"></button></div>
       <div class="row"><span>侧音（发送时发声）</span><button class="tog" data-set="sidetone"></button></div>
       <div class="row"><span>音效<div class="desc">对/错/通关提示音，原版默认 60%</div></span><button class="tog" data-set="sfx"></button></div>
       <div class="row"><span>答错震动</span><button class="tog" data-set="vibrate"></button></div>
@@ -290,6 +294,7 @@ button{font-family:inherit;cursor:pointer;touch-action:manipulation}
   </div>
 
   <div id="toast"></div>
+  <div id="flashOv"></div>
 </div>
 
 <script>
@@ -358,7 +363,7 @@ var DKEY='morseManiaWeb.v3';
 var DB=null;
 try{DB=JSON.parse(localStorage.getItem(DKEY));}catch(e){}
 if(!DB||!DB.settings){DB={done:{},unlocked:0,
-  settings:{theme:'classic',wpm:10,fwpm:6,pressure:3,speedPct:100,lives:3,sidetone:true,sfx:true,vibrate:true,vol:0.8,sfxvol:0.6},
+  settings:{theme:'classic',wpm:10,fwpm:6,pressure:3,speedPct:100,lives:3,sidetone:true,sfx:true,vibrate:true,flash:false,vol:0.8,sfxvol:0.6},
   stats:{answered:0,correct:0}};}
 document.body.setAttribute('data-theme',DB.settings.theme||'classic');
 function save(){try{localStorage.setItem(DKEY,JSON.stringify(DB));}catch(e){}}
@@ -393,6 +398,7 @@ function killAudio(){
   seqToken++;
   for(var i=0;i<timers.length;i++)clearTimeout(timers[i]);
   timers=[];
+  el('flashOv').classList.remove('on');
   while(live.length>0)hardStop(live[0]);
 }
 function timings(){
@@ -404,7 +410,14 @@ function timings(){
   return {dit:dit,elem:dit,charGap:3*(dit+egap),wordGap:7*(dit+egap)};
 }
 /* 单颗音: 立即出声, delay 毫秒后由 JS 停掉. 无任何未来排程. */
+/* 单颗"音": 闪光播报开启时=屏幕白光闪一下(点=短闪/划=长闪, 节奏同 v4 定时器链);
+   关闭时=正常出声. 无声环境(微信静音/勿扰)下也可训练. */
+function flashOn(ms){
+  var v=el('flashOv');v.classList.add('on');
+  regTimer(function(){v.classList.remove('on');},ms);
+}
 function beepNow(dur,freq){
+  if(DB.settings.flash){flashOn(dur);return;}
   ensureAC();if(!AC)return;
   var o=AC.createOscillator(),g=AC.createGain();
   o.type='sine';o.frequency.value=freq||600;
@@ -1014,6 +1027,7 @@ window._mm={db:function(){return DB;},startLevel:startLevel,levels:FLAT,
   ac:function(){return {state:AC?AC.state:'null',currentTime:AC?AC.currentTime:-1};},
   stopTone:stopTone,startTone:startTone,tone:function(){return osc!==null;},
   stuckKeyGuard:stuckKeyGuard,bag:function(){return S?S.bag:null;},
+  flash:function(v){DB.settings.flash=!!v;save();},
   intro:function(){return document.getElementById('mIntro').classList.contains('active');},
   introStart:function(){el('iStart').click();},
   theme:function(t){DB.settings.theme=t;document.body.setAttribute('data-theme',t);save();}};
